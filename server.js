@@ -11,7 +11,7 @@ app.use(cors());
 app.use(express.json()); // Parse JSON payloads
 
 // Routes
-app.use('/api/users', userRoutes);
+app.use('/api/auth', userRoutes);
 
 app.get('/', (req, res) => {
     res.status(200).send('Welcome to the root URL of the server');

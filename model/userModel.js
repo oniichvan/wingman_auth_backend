@@ -31,7 +31,9 @@ const userSchema = new mongoose.Schema({
     timestamp: { 
         type: Date, 
         required: true 
-    }
+    },
+    otp: { type: String }, // Store OTP temporarily
+    isVerified: { type: Boolean, default: false }, // Track OTP verification
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);
