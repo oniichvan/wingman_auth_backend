@@ -130,8 +130,45 @@ const verifyOTP = async (req, res) => {
     }
 };
 
+// @desc Authenticate user based on user input
+// @route POST /api/auth/authenticate
+// @access Public
+const authenticateUser = async (req, res) => {
+    const { mobileNumber, deviceId, isAuthenticated } = req.body;
+
+    // Validate required fields
+    if (!mobileNumber || !deviceId || typeof isAuthenticated !== 'boolean') {
+        return res.status(400).json({ message: 'Mobile number, device ID, and authentication status (true/false) are required.' });
+    }
+
+    try {
+        // Find user by mobile number and device ID
+        const user = await User.findOne({ mobileNumber, deviceId });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        // Store the authentication status based on the payload
+        user.isAuthenticate = isAuthenticated;
+        await user.save();
+
+        // Send a message based on authentication status
+        const message = isAuthenticated
+            ? 'Logged in successfully.'
+            : 'Authentication failed. Please try again.';
+
+        res.status(200).json({ message, user });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error', error });
+    }
+};
+
+
 module.exports = {
     registerUser,
     sendOTP,
-    verifyOTP
+    verifyOTP,
+    authenticateUser
 };
