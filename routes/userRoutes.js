@@ -1,5 +1,5 @@
 const express = require('express');
-const { registerUser, sendOTP, verifyOTP, authenticateUser, updateFirebaseToken, updateDeviceAndToken } = require('../controllers/userController');
+const { registerUser, sendOTP, verifyOTP, authenticateUser, updateFirebaseToken, updateDeviceAndToken, getAllUsers, getUserByMobileNumber} = require('../controllers/userController');
 const router = express.Router();
 
 // Register a new user
@@ -14,5 +14,9 @@ router.post('/authenticate', authenticateUser);
 router.post('/update-token', updateFirebaseToken);
 // Update Device ID and Firebase Token
 router.post('/update-device-token', updateDeviceAndToken);
+// Get all users
+router.get('/all-users', getAllUsers);
+// Get a user by mobile number
+router.get('/user/:mobileNumber', getUserByMobileNumber);
 
 module.exports = router;

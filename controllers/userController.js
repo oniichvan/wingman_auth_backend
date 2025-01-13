@@ -231,6 +231,38 @@ const updateDeviceAndToken = async (req, res) => {
     }
 };
 
+// @desc Get all users
+// @route GET /api/auth/all-users
+// @access Public
+const getAllUsers = async (req, res) => {
+    try {
+        const users = await User.find();
+        res.status(200).json(users);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error', error });
+    }
+};
+
+// @desc Get a user by mobile number
+// @route GET /api/auth/user/:mobileNumber
+// @access Public
+const getUserByMobileNumber = async (req, res) => {
+    const { mobileNumber } = req.params;
+
+    try {
+        const user = await User.findOne({ mobileNumber });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        res.status(200).json(user);
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error', error });
+    }
+};
 
 
 module.exports = {
@@ -239,5 +271,7 @@ module.exports = {
     verifyOTP,
     authenticateUser,
     updateFirebaseToken,
-    updateDeviceAndToken
+    updateDeviceAndToken,
+    getAllUsers,
+    getUserByMobileNumber
 };
