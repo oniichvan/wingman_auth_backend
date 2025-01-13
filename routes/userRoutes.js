@@ -1,5 +1,5 @@
 const express = require('express');
-const { registerUser, sendOTP, verifyOTP, authenticateUser, updateFirebaseToken } = require('../controllers/userController');
+const { registerUser, sendOTP, verifyOTP, authenticateUser, updateFirebaseToken, updateDeviceAndToken } = require('../controllers/userController');
 const router = express.Router();
 
 // Register a new user
@@ -12,5 +12,7 @@ router.post('/verify-otp', verifyOTP);
 router.post('/authenticate', authenticateUser);
 // Update Firebase Token
 router.post('/update-token', updateFirebaseToken);
+// Update Device ID and Firebase Token
+router.post('/update-device-token', updateDeviceAndToken);
 
 module.exports = router;

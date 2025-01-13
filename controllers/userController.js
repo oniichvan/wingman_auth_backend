@@ -200,11 +200,44 @@ const updateFirebaseToken = async (req, res) => {
     }
 };
 
+// @desc Update Device ID and Firebase Token
+// @route POST /api/auth/update-device-token
+// @access Public
+const updateDeviceAndToken = async (req, res) => {
+    const { mobileNumber, newDeviceId, newFirebaseToken } = req.body;
+
+    // Validate required fields
+    if (!mobileNumber || !newDeviceId || !newFirebaseToken) {
+        return res.status(400).json({ message: 'Mobile number, new device ID, and new Firebase token are required.' });
+    }
+
+    try {
+        // Find user by mobile number
+        const user = await User.findOne({ mobileNumber });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        // Update deviceId and firebaseToken
+        user.deviceId = newDeviceId;
+        user.firebaseToken = newFirebaseToken;
+        await user.save();
+
+        res.status(200).json({ message: 'Device ID and Firebase token updated successfully.', user });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error', error });
+    }
+};
+
+
 
 module.exports = {
     registerUser,
     sendOTP,
     verifyOTP,
     authenticateUser,
-    updateFirebaseToken
+    updateFirebaseToken,
+    updateDeviceAndToken
 };
