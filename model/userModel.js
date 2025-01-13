@@ -32,8 +32,16 @@ const userSchema = new mongoose.Schema({
         type: Date, 
         required: true 
     },
-    otp: { type: String }, // Store OTP temporarily
-    isVerified: { type: Boolean, default: false }, // Track OTP verification
+    otp: { 
+        type: String 
+    },
+    otpExpiration: { 
+        type: Date 
+    },
+    isVerified: {
+        type: Boolean,
+        default: false
+    }
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);
