@@ -360,7 +360,7 @@ module.exports = {
     updateDeviceAndToken,
     getAllUsers,
     getUserByMobileNumber,
-    getFCMToken,
+    getOAuth,
     sendPushNotification,
     websiteAuthentication,
 };

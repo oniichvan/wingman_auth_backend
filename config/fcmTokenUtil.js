@@ -2,7 +2,7 @@ const { JWT } = require("google-auth-library");
 const fs = require("fs");
 
 // Path to your service account key file
-const SERVICE_ACCOUNT_FILE = "./config/firebaseServiceAccount.json";
+const SERVICE_ACCOUNT_FILE = "./config/firebase_service_account.json";
 
 // Load the service account key from the JSON file
 const serviceAccount = JSON.parse(fs.readFileSync(SERVICE_ACCOUNT_FILE, "utf-8"));
