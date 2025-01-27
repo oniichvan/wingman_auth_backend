@@ -264,6 +264,18 @@ const getUserByMobileNumber = async (req, res) => {
     }
 };
 
+const getOAuth = async (req, res) => {
+    try {
+        const accessToken = await getAccessToken();
+        res.status(200).json({ accessToken });
+    } catch (error) {
+        res.status(500).json({
+            message: "Failed to fetch FCM access token",
+            error: error.message,
+        });
+    }
+};
+
 
 module.exports = {
     registerUser,
@@ -273,5 +285,6 @@ module.exports = {
     updateFirebaseToken,
     updateDeviceAndToken,
     getAllUsers,
-    getUserByMobileNumber
+    getUserByMobileNumber,
+    getOAuth,
 };

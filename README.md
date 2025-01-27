@@ -304,3 +304,19 @@ const userSchema = new mongoose.Schema({
 
 module.exports = mongoose.model('User', userSchema);
 ```
+
+## 8. API to generate FCM token 
+**Endpoint:** GET https://wingman-auth-backend.onrender.com/api/auth/getOAuth <br>
+**Description:** Generate Access token <br>
+
+### Steps to implement API to generate FCM token
+1. ```npm install google-auth-library```
+2. Open firebase -> Choose project -> project settings -> Service accounts -> Click on 'Generate new private key' -> A json file will be generated, e.g 'firebaseServiceAccount.json' (give the adequate path for it in fcmTokenUtil.js) 
+3. rest follow the code in commit.
+
+**Response:**
+```json
+{
+    "accessToken": "ya29.c.c0ASRK0GbN_n8CVvcNOKDmrNJZumRnmqtX.............
+}
+```
