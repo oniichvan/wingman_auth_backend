@@ -1,5 +1,5 @@
 node_modules
 package-lock.json
 .env
-config/firebaseServiceAccount.json
-config/firebaseServiceAccountNew.json
+firebaseServiceAccount.json
+firebaseServiceAccountNew.json
