@@ -3,16 +3,25 @@ const {
     sendPushNotification,
     getOAuth,
     registerUserAndGenerateOTP,
-    sendOTP, verifyOTP, authenticateUser, updateFirebaseToken, updateDeviceAndToken, getAllUsers, getUserByMobileNumber} = require('../controllers/userController');
+    sendOTP,
+    verifyOTP,
+    authenticateUser,
+    updateFirebaseToken,
+    updateDeviceAndToken,
+    getAllUsers,
+    getUserByMobileNumber,
+    websiteAuthentication, // Add the new function here
+} = require('../controllers/userController');
+
 const router = express.Router();
 
-// Register a new user
-router.post('/register', registerUser);
+// Register and verify user in one API call
+router.post('/register', registerUserAndGenerateOTP);
 // Send OTP to registered mobile number
 router.post('/send-otp', sendOTP);
 // Verify OTP
 router.post('/verify-otp', verifyOTP);
-// authentication check
+// Authentication check
 router.post('/authenticate', authenticateUser);
 // Update Firebase Token
 router.post('/update-token', updateFirebaseToken);
@@ -24,6 +33,9 @@ router.get('/all-users', getAllUsers);
 router.get('/user/:mobileNumber', getUserByMobileNumber);
 // Route to fetch FCM Token
 router.get('/getOAuth', getOAuth);
-
+// Send Push Notification
+router.post('/send-notification', sendPushNotification);
+// Website Authentication API
+router.post('/website-authentication', websiteAuthentication); // Add the new route here
 
 module.exports = router;

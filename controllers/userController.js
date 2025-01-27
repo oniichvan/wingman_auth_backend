@@ -1,47 +1,63 @@
+const admin = require('../config/firebaseConfig');
 const User = require('../model/userModel');
+const { getAccessToken } = require('../config/fcmTokenUtil');
 
-// @desc Register a new user
-// @route POST /api/users/register
-// @access Public
-const registerUser = async (req, res) => {
-    const { mobileNumber, countryCode, email, deviceId, firebaseToken, timestamp } = req.body;
+const registerUserAndGenerateOTP = async (req, res) => {
+    const { mobileNumber, email, deviceId, deviceName, firebaseToken } = req.body;
 
     // Validate required fields
-    if (!mobileNumber || !countryCode || !deviceId || !firebaseToken || !timestamp) {
-        return res.status(400).json({ message: 'All fields except email are required.' });
+    if (!mobileNumber || !deviceId || !firebaseToken || !deviceName) {
+        return res.json({ success: false, message: 'All fields are required.' });
     }
 
     try {
-        // Check if the deviceId already exists
-        const existingUser = await User.findOne({ deviceId });
+        // Check if a user with the same mobileNumber already exists
+        const existingUser = await User.findOne({ mobileNumber });
         if (existingUser) {
-            return res.status(400).json({ message: 'Device ID already registered.' });
+            return res.json({ success: false, message: 'User with this mobile number already registered.' });
         }
 
-        // Create new user
+        // Generate a static OTP for testing purposes
+        const generatedOTP = '9999'; // Replace this with a dynamic OTP generation logic in production
+
+        // Create new user with isVerified: false and OTP
         const user = new User({
             mobileNumber,
-            countryCode,
             email,
             deviceId,
+            deviceName,
             firebaseToken,
-            timestamp: new Date(timestamp)
+            otp: generatedOTP,
+            isVerified: false,
+            timestamp: new Date() // Automatically set the timestamp
         });
 
-        await user.save(); // save the response in database
-        res.status(201).json({ message: 'User registered successfully', user });
+        await user.save(); // Save the user to the database
+
+        // Return success response with OTP (for testing purposes)
+        return res.json({ 
+            success: true, 
+            message: 'OTP generated and user registered successfully.', 
+            otp: generatedOTP 
+        });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error', error });
+
+        // Handle validation errors
+        if (error.name === 'ValidationError') {
+            return res.json({ success: false, message: error.message });
+        }
+
+        // Handle duplicate key error (e.g., duplicate deviceId)
+        if (error.code === 11000) {
+            return res.json({ success: false, message: 'Device ID must be unique.' });
+        }
+
+        return res.json({ success: false, message: 'Server error. Please try again later.' });
     }
 };
 
-// @desc Send OTP to registered mobile number
-// @route POST /api/users/send-otp
-// @access Public
-// @desc Send OTP to registered mobile number
-// @route POST /api/users/send-otp
-// @access Public
+
 const sendOTP = async (req, res) => {
     const { mobileNumber, countryCode } = req.body;
 
@@ -88,12 +104,8 @@ const sendOTP = async (req, res) => {
     }
 };
 
-
-// @desc Verify OTP
-// @route POST /api/users/verify-otp
-// @access Public
 const verifyOTP = async (req, res) => {
-    const { mobileNumber, otp, firebaseToken } = req.body;
+    const { mobileNumber, otp } = req.body;
 
     if (!mobileNumber || !otp) {
         return res.status(400).json({ message: 'Mobile number and OTP are required.' });
@@ -112,17 +124,11 @@ const verifyOTP = async (req, res) => {
             return res.status(400).json({ message: 'Invalid OTP.' });
         }
 
-        // Check if OTP has expired
-        if (new Date() > user.otpExpiration) {
-            return res.status(400).json({ message: 'OTP has expired.' });
-        }
-
         // Update user verification status and firebase token
         user.isVerified = true;
-        user.firebaseToken = firebaseToken || user.firebaseToken; // Optional, only if provided
-        user.otp = null; // Clear OTP after verification
+        // user.otp = null; // Clear OTP after verification
         await user.save();
-
+        
         res.status(200).json({ message: 'OTP verified successfully.', user });
     } catch (error) {
         console.error(error);
@@ -130,9 +136,6 @@ const verifyOTP = async (req, res) => {
     }
 };
 
-// @desc Authenticate user based on user input
-// @route POST /api/auth/authenticate
-// @access Public
 const authenticateUser = async (req, res) => {
     const { mobileNumber, deviceId, isAuthenticated } = req.body;
 
@@ -165,9 +168,6 @@ const authenticateUser = async (req, res) => {
     }
 };
 
-// @desc Update Firebase Token
-// @route POST /api/auth/update-token
-// @access Public
 const updateFirebaseToken = async (req, res) => {
     const { deviceId, oldFirebaseToken, newFirebaseToken } = req.body;
 
@@ -200,9 +200,6 @@ const updateFirebaseToken = async (req, res) => {
     }
 };
 
-// @desc Update Device ID and Firebase Token
-// @route POST /api/auth/update-device-token
-// @access Public
 const updateDeviceAndToken = async (req, res) => {
     const { mobileNumber, newDeviceId, newFirebaseToken } = req.body;
 
@@ -231,9 +228,6 @@ const updateDeviceAndToken = async (req, res) => {
     }
 };
 
-// @desc Get all users
-// @route GET /api/auth/all-users
-// @access Public
 const getAllUsers = async (req, res) => {
     try {
         const users = await User.find();
@@ -244,9 +238,6 @@ const getAllUsers = async (req, res) => {
     }
 };
 
-// @desc Get a user by mobile number
-// @route GET /api/auth/user/:mobileNumber
-// @access Public
 const getUserByMobileNumber = async (req, res) => {
     const { mobileNumber } = req.params;
 
@@ -276,9 +267,92 @@ const getOAuth = async (req, res) => {
     }
 };
 
+const sendPushNotification = async (req, res) => {
+    const { firebaseToken, title, body } = req.body;
+
+    if (!firebaseToken || !title || !body) {
+        return res.status(400).json({ message: 'Firebase Token, title, and body are required.' });
+    }
+
+    const message = {
+        notification: {
+            title,
+            body,
+        },
+        token: firebaseToken,
+    };
+
+    try {
+        const response = await admin.messaging().send(message);
+        res.status(200).json({ message: 'Notification sent successfully', response });
+    } catch (error) {
+        console.error('Error sending notification:', error);
+        res.status(500).json({ message: 'Failed to send notification', error });
+    }
+};
+
+const websiteAuthentication = async (req, res) => {
+    const { mobileNumber, website, action } = req.body;
+
+    // Validate required fields
+    if (!mobileNumber || !website || !action) {
+        return res.status(400).json({ message: 'Mobile number, website, and action are required.' });
+    }
+
+    try {
+        // Find the user by mobile number
+        const user = await User.findOne({ mobileNumber });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        // Check if the user has a valid Firebase token
+        if (!user.firebaseToken) {
+            return res.status(400).json({ message: 'User does not have a valid Firebase token.' });
+        }
+
+        // Prepare the push notification message
+        const deviceName = 'Unknown Device'; // You can fetch this from the request or user's device info
+        const notificationTitle = 'Login Attempt';
+        const notificationBody = `Are you trying to log in to ${website} from ${deviceName}?`;
+
+        const message = {
+            notification: {
+                title: notificationTitle,
+                body: notificationBody,
+            },
+            token: user.firebaseToken,
+            data: {
+                website,
+                action: 'pending', // Indicates that the user needs to take action
+            },
+        };
+
+        // Send the push notification
+        const response = await admin.messaging().send(message);
+
+        // Handle the user's action (accept/deny)
+        if (action === 'accept') {
+            // Update the user's authentication status (e.g., mark as authenticated)
+            user.isAuthenticate = true;
+            await user.save();
+
+            res.status(200).json({ message: 'Login attempt accepted.', response });
+        } else if (action === 'deny') {
+            // Mark the login attempt as denied
+            res.status(200).json({ message: 'Login attempt denied.', response });
+        } else {
+            return res.status(400).json({ message: 'Invalid action. Use "accept" or "deny".' });
+        }
+    } catch (error) {
+        console.error('Error in website authentication:', error);
+        res.status(500).json({ message: 'Failed to process website authentication.', error });
+    }
+};
+
 
 module.exports = {
-    registerUser,
+    registerUserAndGenerateOTP,
     sendOTP,
     verifyOTP,
     authenticateUser,
@@ -286,5 +360,7 @@ module.exports = {
     updateDeviceAndToken,
     getAllUsers,
     getUserByMobileNumber,
-    getOAuth,
+    getFCMToken,
+    sendPushNotification,
+    websiteAuthentication,
 };
