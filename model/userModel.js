@@ -46,6 +46,14 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
+    websiteId: { // Add websiteId field
+        type: String,
+        required: true,
+    },
+    websiteName: { // Add websiteName field
+        type: String,
+        required: true,
+    },
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

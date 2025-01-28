@@ -1,6 +1,7 @@
 const express = require('express');
 const {
     sendPushNotification,
+    sendPushNotificationOnLogin,
     getOAuth,
     registerUserAndGenerateOTP,
     sendOTP,
@@ -17,10 +18,14 @@ const router = express.Router();
 
 // Register and verify user in one API call
 router.post('/register', registerUserAndGenerateOTP);
-// Send OTP to registered mobile number
-router.post('/send-otp', sendOTP);
 // Verify OTP
 router.post('/verify-otp', verifyOTP);
+// send push notification on login
+router.post('/onLogin', sendPushNotificationOnLogin);
+
+
+// Send OTP to registered mobile number
+router.post('/send-otp', sendOTP);
 // Authentication check
 router.post('/authenticate', authenticateUser);
 // Update Firebase Token

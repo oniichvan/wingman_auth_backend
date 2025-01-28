@@ -3,7 +3,7 @@ const User = require('../model/userModel');
 const { getAccessToken } = require('../config/fcmTokenUtil');
 
 const registerUserAndGenerateOTP = async (req, res) => {
-    const { mobileNumber, email, deviceId, deviceName, firebaseToken } = req.body;
+    const { mobileNumber, email, deviceId, deviceName, firebaseToken, websiteId, websiteName } = req.body;
 
     // Validate required fields
     if (!mobileNumber || !deviceId || !firebaseToken || !deviceName) {
@@ -27,6 +27,8 @@ const registerUserAndGenerateOTP = async (req, res) => {
             deviceId,
             deviceName,
             firebaseToken,
+            websiteId, // Store websiteId
+            websiteName, // Store websiteName
             otp: generatedOTP,
             isVerified: false,
             timestamp: new Date() // Automatically set the timestamp
@@ -57,6 +59,74 @@ const registerUserAndGenerateOTP = async (req, res) => {
     }
 };
 
+const verifyOTP = async (req, res) => {
+    const { mobileNumber, otp } = req.body;
+
+    if (!mobileNumber || !otp) {
+        return res.status(400).json({ message: 'Mobile number and OTP are required.' });
+    }
+
+    try {
+        // Find user by mobile number
+        const user = await User.findOne({ mobileNumber });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        // Check if OTP matches
+        if (user.otp !== otp) {
+            return res.status(400).json({ message: 'Invalid OTP.' });
+        }
+
+        // Update user verification status and firebase token
+        user.isVerified = true;
+        // user.otp = null; // Clear OTP after verification
+        await user.save();
+        
+        res.status(200).json({ message: 'OTP verified successfully.', user });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error', error });
+    }
+};
+
+const sendPushNotificationOnLogin = async (req, res) => {
+    const { mobileNumber } = req.body;
+
+    if (!mobileNumber) {
+        return res.status(400).json({ message: 'Mobile number is required.' });
+    }
+
+    try {
+        // Find user by mobile number
+        const user = await User.findOne({ mobileNumber });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        // Check if the user has a valid FCM token (optional for mock response)
+        if (!user.firebaseToken) {
+            return res.status(400).json({ message: 'No FCM token found for this user.' });
+        }
+
+        // Mock response data
+        const mockResponse = {
+            websiteId: user.websiteId, // Fetch websiteId from the user's record
+            websiteName: user.websiteName, // Fetch websiteName from the user's record
+            notificationSent: new Date().toISOString(), // Current timestamp
+            notificationExpires: new Date(Date.now() + 3600 * 1000).toISOString(), // Expires in 1 hour
+            message: 'Mock notification data sent successfully.',
+        };
+
+        // Return the mock response
+        res.status(200).json(mockResponse);
+    } catch (error) {
+        console.error('Error fetching user data:', error);
+        res.status(500).json({ message: 'Server error. Please try again later.', error });
+    }
+};
 
 const sendOTP = async (req, res) => {
     const { mobileNumber, countryCode } = req.body;
@@ -98,38 +168,6 @@ const sendOTP = async (req, res) => {
         }, 1000); // Update every second
 
         res.status(200).json({ message: 'OTP sent successfully.', otp }); // For testing purpose, return the OTP
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error', error });
-    }
-};
-
-const verifyOTP = async (req, res) => {
-    const { mobileNumber, otp } = req.body;
-
-    if (!mobileNumber || !otp) {
-        return res.status(400).json({ message: 'Mobile number and OTP are required.' });
-    }
-
-    try {
-        // Find user by mobile number
-        const user = await User.findOne({ mobileNumber });
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
-
-        // Check if OTP matches
-        if (user.otp !== otp) {
-            return res.status(400).json({ message: 'Invalid OTP.' });
-        }
-
-        // Update user verification status and firebase token
-        user.isVerified = true;
-        // user.otp = null; // Clear OTP after verification
-        await user.save();
-        
-        res.status(200).json({ message: 'OTP verified successfully.', user });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error', error });
@@ -353,8 +391,9 @@ const websiteAuthentication = async (req, res) => {
 
 module.exports = {
     registerUserAndGenerateOTP,
-    sendOTP,
     verifyOTP,
+    sendPushNotificationOnLogin,
+    sendOTP,
     authenticateUser,
     updateFirebaseToken,
     updateDeviceAndToken,
@@ -363,4 +402,5 @@ module.exports = {
     getOAuth,
     sendPushNotification,
     websiteAuthentication,
+    
 };
