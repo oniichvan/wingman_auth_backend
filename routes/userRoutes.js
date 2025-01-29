@@ -1,5 +1,6 @@
 const express = require('express');
 const {
+    deleteAllUsers,
     sendPushNotification,
     sendPushNotificationOnLogin,
     getOAuth,
@@ -41,6 +42,8 @@ router.get('/getOAuth', getOAuth);
 // Send Push Notification
 router.post('/send-notification', sendPushNotification);
 // Website Authentication API
-router.post('/website-authentication', websiteAuthentication); // Add the new route here
+router.post('/website-authentication', websiteAuthentication); 
+// Delete all users
+router.delete('/deleteAll', deleteAllUsers);
 
 module.exports = router;

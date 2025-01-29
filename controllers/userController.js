@@ -11,37 +11,51 @@ const registerUserAndGenerateOTP = async (req, res) => {
     }
 
     try {
-        // Check if a user with the same mobileNumber already exists
-        const existingUser = await User.findOne({ mobileNumber });
+        // Generate static OTP for testing
+        const generatedOTP = '9999'; // Replace with dynamic OTP in production
+
+        // Check if user exists with the same mobileNumber AND deviceId
+        const existingUser = await User.findOne({ mobileNumber, deviceId });
+
         if (existingUser) {
-            return res.json({ success: false, message: 'User with this mobile number already registered.' });
+            // Update existing user's OTP and other fields
+            existingUser.email = email;
+            existingUser.deviceName = deviceName;
+            existingUser.firebaseToken = firebaseToken;
+            existingUser.websiteId = websiteId;
+            existingUser.websiteName = websiteName;
+            existingUser.otp = generatedOTP;
+            existingUser.timestamp = new Date();
+            await existingUser.save();
+
+            return res.json({ 
+                success: true, 
+                message: 'OTP regenerated for existing user.', 
+                otp: generatedOTP 
+            });
+        } else {
+            // Create new user
+            const user = new User({
+                mobileNumber,
+                email,
+                deviceId,
+                deviceName,
+                firebaseToken,
+                websiteId,
+                websiteName,
+                otp: generatedOTP,
+                isVerified: false,
+                timestamp: new Date()
+            });
+
+            await user.save();
+
+            return res.json({ 
+                success: true, 
+                message: 'User registered and OTP generated.', 
+                otp: generatedOTP 
+            });
         }
-
-        // Generate a static OTP for testing purposes
-        const generatedOTP = '9999'; // Replace this with a dynamic OTP generation logic in production
-
-        // Create new user with isVerified: false and OTP
-        const user = new User({
-            mobileNumber,
-            email,
-            deviceId,
-            deviceName,
-            firebaseToken,
-            websiteId, // Store websiteId
-            websiteName, // Store websiteName
-            otp: generatedOTP,
-            isVerified: false,
-            timestamp: new Date() // Automatically set the timestamp
-        });
-
-        await user.save(); // Save the user to the database
-
-        // Return success response with OTP (for testing purposes)
-        return res.json({ 
-            success: true, 
-            message: 'OTP generated and user registered successfully.', 
-            otp: generatedOTP 
-        });
     } catch (error) {
         console.error(error);
 
@@ -50,12 +64,12 @@ const registerUserAndGenerateOTP = async (req, res) => {
             return res.json({ success: false, message: error.message });
         }
 
-        // Handle duplicate key error (e.g., duplicate deviceId)
+        // Handle duplicate key error (e.g., deviceId already exists)
         if (error.code === 11000) {
-            return res.json({ success: false, message: 'Device ID must be unique.' });
+            return res.json({ success: false, message: 'Device ID is already in use.' });
         }
 
-        return res.json({ success: false, message: 'Server error. Please try again later.' });
+        return res.json({ success: false, message: 'Server error. Please try again.' });
     }
 };
 
@@ -92,41 +106,57 @@ const verifyOTP = async (req, res) => {
 };
 
 const sendPushNotificationOnLogin = async (req, res) => {
-    const { mobileNumber } = req.body;
-
-    if (!mobileNumber) {
-        return res.status(400).json({ message: 'Mobile number is required.' });
-    }
-
     try {
+        const { mobileNumber, websiteId, websiteName, notificationSent, notificationExpires } = req.body;
+
+        // Validate required fields
+        if (![mobileNumber, websiteId, websiteName, notificationSent, notificationExpires].every(Boolean)) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'All fields (mobileNumber, websiteId, websiteName, notificationSent, notificationExpires) are required.' 
+            });
+        }
+
         // Find user by mobile number
         const user = await User.findOne({ mobileNumber });
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+            return res.status(404).json({ success: false, message: 'User not found.' });
         }
 
-        // Check if the user has a valid FCM token (optional for mock response)
         if (!user.firebaseToken) {
-            return res.status(400).json({ message: 'No FCM token found for this user.' });
+            return res.status(400).json({ success: false, message: 'No FCM token found for this user.' });
         }
 
-        // Mock response data
-        const mockResponse = {
-            websiteId: user.websiteId, // Fetch websiteId from the user's record
-            websiteName: user.websiteName, // Fetch websiteName from the user's record
-            notificationSent: new Date().toISOString(), // Current timestamp
-            notificationExpires: new Date(Date.now() + 3600 * 1000).toISOString(), // Expires in 1 hour
-            message: 'Mock notification data sent successfully.',
+        // Prepare and send push notification
+        const notificationPayload = {
+            notification: {
+                title: 'Login Attempt',
+                body: `Are you trying to login to ${websiteName}?`,
+            },
+            data: { websiteId, websiteName, notificationSent, notificationExpires },
+            token: user.firebaseToken,
         };
 
-        // Return the mock response
-        res.status(200).json(mockResponse);
+        const fcmResponse = await admin.messaging().send(notificationPayload);
+
+        res.status(200).json({ 
+            success: true, 
+            message: 'Push notification sent successfully.', 
+            fcmResponse 
+        });
     } catch (error) {
-        console.error('Error fetching user data:', error);
-        res.status(500).json({ message: 'Server error. Please try again later.', error });
+        console.error('Error sending push notification:', error);
+
+        const errorMessage = error.code === 'messaging/invalid-registration-token' || 
+                             error.code === 'messaging/registration-token-not-registered'
+            ? 'Invalid or unregistered Firebase token.'
+            : 'Server error. Please try again later.';
+
+        res.status(error.code ? 400 : 500).json({ success: false, message: errorMessage, error: error.message });
     }
 };
+
 
 const sendOTP = async (req, res) => {
     const { mobileNumber, countryCode } = req.body;
@@ -388,6 +418,23 @@ const websiteAuthentication = async (req, res) => {
     }
 };
 
+const deleteAllUsers = async (req, res) => {
+    try {
+        // Delete all users from the database
+        const result = await User.deleteMany({});
+
+        // Check if any users were deleted
+        if (result.deletedCount === 0) {
+            return res.status(404).json({ message: 'No users found to delete.' });
+        }
+
+        // Return success response
+        res.status(200).json({ message: 'All users deleted successfully.', deletedCount: result.deletedCount });
+    } catch (error) {
+        console.error('Error deleting users:', error);
+        res.status(500).json({ message: 'Server error. Failed to delete users.', error });
+    }
+};
 
 module.exports = {
     registerUserAndGenerateOTP,
@@ -402,5 +449,5 @@ module.exports = {
     getOAuth,
     sendPushNotification,
     websiteAuthentication,
-    
+    deleteAllUsers,
 };
