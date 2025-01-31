@@ -3,3 +3,4 @@ package-lock.json
 .env
 /config/firebase_service_account_new.json 
 /config/firebase_service_account.json
+/config/saber_fsa.json

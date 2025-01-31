@@ -1,21 +1,21 @@
 const mongoose = require('mongoose');
 
 const userSchema = new mongoose.Schema({
-    mobileNumber: { 
-        type: String, 
+    mobileNumber: {
+        type: String,
         required: true,
         validate: {
-            validator: function(v) {
+            validator: function (v) {
                 // Check if the mobile number is exactly 10 digits and contains only numbers
                 return /^\d{10}$/.test(v);
             },
             message: props => `${props.value} is not a valid mobile number!`
         }
     },
-    email: { 
-        type: String, 
+    email: {
+        type: String,
         validate: {
-            validator: function(v) {
+            validator: function (v) {
                 return /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/.test(v);
             },
             message: props => `${props.value} is not a valid email!`
@@ -23,23 +23,23 @@ const userSchema = new mongoose.Schema({
         required: false
     },
     deviceName: {
-        type: String, 
+        type: String,
         required: true,
     },
-    deviceId: { 
-        type: String, 
-        required: true, 
-        unique: true 
+    deviceId: {
+        type: String,
+        required: true,
+        unique: true
     },
-    firebaseToken: { 
-        type: String, 
-        required: true 
+    firebaseToken: {
+        type: String,
+        required: true
     },
-    timestamp: { 
-        type: Date, 
-        required: true 
+    timestamp: {
+        type: Date,
+        required: true
     },
-    otp: { 
+    otp: {
         type: Number
     },
     isVerified: {
@@ -53,6 +53,10 @@ const userSchema = new mongoose.Schema({
     websiteName: { // Add websiteName field
         type: String,
         required: true,
+    },
+    isAuthenticated: { 
+        type: Boolean,
+        default: false,
     },
 }, { timestamps: true });
 
