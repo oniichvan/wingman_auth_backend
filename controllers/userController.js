@@ -129,6 +129,16 @@ const sendPushNotificationOnLogin = async (req, res) => {
         }
 
         // Prepare and send push notification
+        const notificationPayload = {
+            notification: {
+                title: 'Login Attempt',
+                body: `Are you trying to login to ${websiteName}?`,
+            },
+            data: { websiteId, websiteName, notificationSent, notificationExpires },
+            token: user.firebaseToken,
+        };
+        
+        // Prepare and send push notification
         const fcmResponse = await admin.messaging().send(notificationPayload);
 
         res.status(200).json({ 
