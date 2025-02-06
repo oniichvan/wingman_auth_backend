@@ -8,7 +8,6 @@ const {
     updateDeviceAndToken,
     getAllUsers,
     getUserByMobileNumber,
-    authenticateUserAction,
 } = require('../controllers/userController');
 
 const router = express.Router();
@@ -19,8 +18,6 @@ router.post('/register', registerUserAndGenerateOTP);
 router.post('/verify-otp', verifyOTP);
 // send push notification on login
 router.post('/onLogin', sendPushNotificationOnLogin);
-// Authenticate user
-router.post('/authenticateUser', authenticateUserAction);
 
 
 // Update Device ID and Firebase Token

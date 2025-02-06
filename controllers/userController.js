@@ -129,15 +129,6 @@ const sendPushNotificationOnLogin = async (req, res) => {
         }
 
         // Prepare and send push notification
-        const notificationPayload = {
-            notification: {
-                title: 'Login Attempt',
-                body: `Are you trying to login to ${websiteName}?`,
-            },
-            data: { websiteId, websiteName, notificationSent, notificationExpires },
-            token: user.firebaseToken,
-        };
-
         const fcmResponse = await admin.messaging().send(notificationPayload);
 
         res.status(200).json({ 
@@ -154,59 +145,6 @@ const sendPushNotificationOnLogin = async (req, res) => {
             : 'Server error. Please try again later.';
 
         res.status(error.code ? 400 : 500).json({ success: false, message: errorMessage, error: error.message });
-    }
-};
-
-const authenticateUserAction = async (req, res) => {
-    const { mobileNumber, action, websiteId } = req.body;
-
-    // Validate required fields
-    if (!mobileNumber || action === undefined || !websiteId) {
-        return res.status(400).json({ 
-            success: false, 
-            message: 'mobileNumber, action, and websiteId are required.' 
-        });
-    }       
-
-    try {
-        // Find user by mobile number
-        const user = await User.findOne({ mobileNumber });
-
-        if (!user) {
-            return res.status(404).json({ 
-                success: false, 
-                message: 'User not found.' 
-            });
-        }
-
-        if (!user.firebaseToken) {
-            return res.status(400).json({
-                success: false,
-                message: 'No FCM token found for this user.',
-            });
-        } 
-
-        // Check if the action is true or false
-        if (action) {
-            // If action is true, authenticate the user
-            user.isAuthenticated = true;
-            await user.save();
-
-            return res.status(200).json({ 
-                message: 'User authenticated successfully.' 
-            });
-        } else {
-            // If action is false, do not authenticate the user
-            return res.status(200).json({ 
-                message: 'User authentication denied.' 
-            });
-        }
-    } catch (error) {
-        console.error(error);
-        return res.status(500).json({ 
-            success: false, 
-            message: 'Server error. Please try again.' 
-        });
     }
 };
 
@@ -316,5 +254,4 @@ module.exports = {
     getUserByMobileNumber,
     sendPushNotification,
     deleteAllUsers,
-    authenticateUserAction
 };

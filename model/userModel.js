@@ -28,8 +28,6 @@ const userSchema = new mongoose.Schema({
     },
     deviceId: {
         type: String,
-        required: true,
-        unique: true
     },
     firebaseToken: {
         type: String,
@@ -53,10 +51,6 @@ const userSchema = new mongoose.Schema({
     websiteName: { // Add websiteName field
         type: String,
         required: true,
-    },
-    isAuthenticated: { 
-        type: Boolean,
-        default: false,
     },
 }, { timestamps: true });
 

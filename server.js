@@ -2,6 +2,7 @@ const express = require('express');
 const connectDB = require('./config/db');
 const cors = require('cors');
 const userRoutes = require('./routes/userRoutes');
+const websiteRoutes = require('./routes/websiteRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,6 +13,7 @@ app.use(express.json()); // Parse JSON payloads
 
 // Routes
 app.use('/api/auth', userRoutes);
+app.use('/api/website', websiteRoutes);
 
 app.get('/', (req, res) => {
     res.status(200).send('Welcome to the root URL of the server');
