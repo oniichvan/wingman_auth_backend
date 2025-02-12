@@ -14,8 +14,11 @@ const registerUserAndGenerateOTP = async (req, res) => {
         // Generate static OTP for testing
         const generatedOTP = '9999'; // Replace with dynamic OTP in production
 
+        // Set all previous registrations of the same mobileNumber to isActive = false
+        await User.updateMany({ mobileNumber }, { $set: { isActive: false } });
+
         // Check if user exists with the same mobileNumber AND deviceId
-        const existingUser = await User.findOne({ mobileNumber, deviceId });
+        let existingUser = await User.findOne({ mobileNumber, deviceId });
 
         if (existingUser) {
             // Update existing user's OTP and other fields
@@ -26,6 +29,7 @@ const registerUserAndGenerateOTP = async (req, res) => {
             existingUser.websiteName = websiteName;
             existingUser.otp = generatedOTP;
             existingUser.timestamp = new Date();
+            existingUser.isActive = true; // Set the latest device as active
             await existingUser.save();
 
             return res.json({ 
@@ -34,7 +38,7 @@ const registerUserAndGenerateOTP = async (req, res) => {
                 otp: generatedOTP 
             });
         } else {
-            // Create new user
+            // Create new user entry with isActive = true
             const user = new User({
                 mobileNumber,
                 email,
@@ -45,7 +49,8 @@ const registerUserAndGenerateOTP = async (req, res) => {
                 websiteName,
                 otp: generatedOTP,
                 isVerified: false,
-                timestamp: new Date()
+                timestamp: new Date(),
+                isActive: true
             });
 
             await user.save();
@@ -59,12 +64,9 @@ const registerUserAndGenerateOTP = async (req, res) => {
     } catch (error) {
         console.error(error);
 
-        // Handle validation errors
         if (error.name === 'ValidationError') {
             return res.json({ success: false, message: error.message });
         }
-
-        // Handle duplicate key error (e.g., deviceId already exists)
         if (error.code === 11000) {
             return res.json({ success: false, message: 'Device ID is already in use.' });
         }
@@ -72,6 +74,7 @@ const registerUserAndGenerateOTP = async (req, res) => {
         return res.json({ success: false, message: 'Server error. Please try again.' });
     }
 };
+
 
 const verifyOTP = async (req, res) => {
     const { mobileNumber, otp } = req.body;
