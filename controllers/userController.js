@@ -5,7 +5,6 @@ const { getAccessToken } = require('../config/fcmTokenUtil');
 const registerUserAndGenerateOTP = async (req, res) => {
     const { mobileNumber, email, deviceId, deviceName, firebaseToken, websiteId, websiteName } = req.body;
 
-    // Validate required fields
     if (!mobileNumber || !deviceId || !firebaseToken || !deviceName) {
         return res.json({ success: false, message: 'All fields are required.' });
     }
@@ -14,14 +13,10 @@ const registerUserAndGenerateOTP = async (req, res) => {
         // Generate static OTP for testing
         const generatedOTP = '9999'; // Replace with dynamic OTP in production
 
-        // Set all previous registrations of the same mobileNumber to isActive = false
-        await User.updateMany({ mobileNumber }, { $set: { isActive: false } });
-
         // Check if user exists with the same mobileNumber AND deviceId
         let existingUser = await User.findOne({ mobileNumber, deviceId });
 
         if (existingUser) {
-            // Update existing user's OTP and other fields
             existingUser.email = email;
             existingUser.deviceName = deviceName;
             existingUser.firebaseToken = firebaseToken;
@@ -29,7 +24,7 @@ const registerUserAndGenerateOTP = async (req, res) => {
             existingUser.websiteName = websiteName;
             existingUser.otp = generatedOTP;
             existingUser.timestamp = new Date();
-            existingUser.isActive = true; // Set the latest device as active
+            existingUser.isActive = false; // isActive should be false until OTP is verified
             await existingUser.save();
 
             return res.json({ 
@@ -38,7 +33,7 @@ const registerUserAndGenerateOTP = async (req, res) => {
                 otp: generatedOTP 
             });
         } else {
-            // Create new user entry with isActive = true
+            // Create new user entry with isActive = false
             const user = new User({
                 mobileNumber,
                 email,
@@ -50,7 +45,7 @@ const registerUserAndGenerateOTP = async (req, res) => {
                 otp: generatedOTP,
                 isVerified: false,
                 timestamp: new Date(),
-                isActive: true
+                isActive: false
             });
 
             await user.save();
@@ -63,18 +58,9 @@ const registerUserAndGenerateOTP = async (req, res) => {
         }
     } catch (error) {
         console.error(error);
-
-        if (error.name === 'ValidationError') {
-            return res.json({ success: false, message: error.message });
-        }
-        if (error.code === 11000) {
-            return res.json({ success: false, message: 'Device ID is already in use.' });
-        }
-
         return res.json({ success: false, message: 'Server error. Please try again.' });
     }
 };
-
 
 const verifyOTP = async (req, res) => {
     const { mobileNumber, otp } = req.body;
@@ -84,27 +70,32 @@ const verifyOTP = async (req, res) => {
     }
 
     try {
-        // Find user by mobile number
-        const user = await User.findOne({ mobileNumber });
+        // Find the latest registered user for the given mobileNumber (based on timestamp)
+        const user = await User.findOne({ mobileNumber }).sort({ timestamp: -1 });
 
         if (!user) {
             return res.status(404).json({ message: 'User not found.' });
         }
 
-        // Check if OTP matches
         if (user.otp !== otp) {
             return res.status(400).json({ message: 'Invalid OTP.' });
         }
 
-        // Update user verification status and firebase token
+        // Retrieve the deviceId from the latest registered user
+        const deviceId = user.deviceId;
+
+        // Set all previous records with the same mobileNumber to isActive = false
+        await User.updateMany({ mobileNumber }, { $set: { isActive: false } });
+
+        // Set the latest verified user as active
         user.isVerified = true;
-        // user.otp = null; // Clear OTP after verification
+        user.isActive = true;
         await user.save();
-        
-        res.status(200).json({ message: 'OTP verified successfully.', user });
+
+        return res.status(200).json({ message: 'OTP verified successfully.', user, deviceId });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error', error });
+        return res.status(500).json({ message: 'Server error', error });
     }
 };
 
@@ -120,18 +111,18 @@ const sendPushNotificationOnLogin = async (req, res) => {
             });
         }
 
-        // Find user by mobile number
-        const user = await User.findOne({ mobileNumber });
+        // Find the active and verified user for the given mobile number
+        const user = await User.findOne({ mobileNumber, isVerified: true, isActive: true });
 
         if (!user) {
-            return res.status(404).json({ success: false, message: 'User not found.' });
+            return res.status(404).json({ success: false, message: 'No active and verified user found.' });
         }
 
         if (!user.firebaseToken) {
             return res.status(400).json({ success: false, message: 'No FCM token found for this user.' });
         }
 
-        // Prepare and send push notification
+        // Prepare push notification payload
         const notificationPayload = {
             notification: {
                 title: 'Login Attempt',
@@ -140,8 +131,8 @@ const sendPushNotificationOnLogin = async (req, res) => {
             data: { websiteId, websiteName, notificationSent, notificationExpires },
             token: user.firebaseToken,
         };
-        
-        // Prepare and send push notification
+
+        // Send push notification
         const fcmResponse = await admin.messaging().send(notificationPayload);
 
         res.status(200).json({ 
@@ -160,6 +151,7 @@ const sendPushNotificationOnLogin = async (req, res) => {
         res.status(error.code ? 400 : 500).json({ success: false, message: errorMessage, error: error.message });
     }
 };
+
 
 const updateDeviceAndToken = async (req, res) => {
     const { mobileNumber, newDeviceId, newFirebaseToken } = req.body;
