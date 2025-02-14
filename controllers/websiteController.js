@@ -1,6 +1,7 @@
 const Website = require('../model/websiteModel');
 const User = require('../model/userModel');
 
+// verifies and records a user's login attempt from a specific website using their mobile number and device ID.
 const authenticateWebsite = async (req, res) => {
     const { mobileNumber, action, websiteId } = req.body;
 
@@ -13,7 +14,7 @@ const authenticateWebsite = async (req, res) => {
         }
 
         // Get the deviceId linked with the mobileNumber from the User model
-        const deviceId = user.deviceId; // Assuming deviceId is stored in the User model
+        const deviceId = user.deviceId; 
 
         if (!deviceId) {
             return res.status(400).json({ message: 'Device ID is not associated with the user.' });

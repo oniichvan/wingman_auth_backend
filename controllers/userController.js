@@ -1,19 +1,17 @@
 const admin = require('../config/firebaseConfig');
 const User = require('../model/userModel');
-const { getAccessToken } = require('../config/fcmTokenUtil');
+const ResponseObj = require('../utils/responseUtil'); 
 
 const registerUserAndGenerateOTP = async (req, res) => {
     const { mobileNumber, email, deviceId, deviceName, firebaseToken, websiteId, websiteName } = req.body;
 
     if (!mobileNumber || !deviceId || !firebaseToken || !deviceName) {
-        return res.json({ success: false, message: 'All fields are required.' });
+        return res.status(400).json(ResponseObj.failure('All fields are required.'));
     }
 
     try {
-        // Generate static OTP for testing
-        const generatedOTP = '9999'; // Replace with dynamic OTP in production
+        const generatedOTP = '9999'; // Static OTP for testing
 
-        // Check if user exists with the same mobileNumber AND deviceId
         let existingUser = await User.findOne({ mobileNumber, deviceId });
 
         if (existingUser) {
@@ -24,16 +22,11 @@ const registerUserAndGenerateOTP = async (req, res) => {
             existingUser.websiteName = websiteName;
             existingUser.otp = generatedOTP;
             existingUser.timestamp = new Date();
-            existingUser.isActive = false; // isActive should be false until OTP is verified
+            existingUser.isActive = false;
             await existingUser.save();
 
-            return res.json({ 
-                success: true, 
-                message: 'OTP regenerated for existing user.', 
-                otp: generatedOTP 
-            });
+            return res.status(200).json(ResponseObj.success('OTP regenerated for existing user.', { otp: generatedOTP }));
         } else {
-            // Create new user entry with isActive = false
             const user = new User({
                 mobileNumber,
                 email,
@@ -50,15 +43,11 @@ const registerUserAndGenerateOTP = async (req, res) => {
 
             await user.save();
 
-            return res.json({ 
-                success: true, 
-                message: 'User registered and OTP generated.', 
-                otp: generatedOTP 
-            });
+            return res.status(200).json(ResponseObj.success('User registered and OTP generated.', { otp: generatedOTP }));
         }
     } catch (error) {
         console.error(error);
-        return res.json({ success: false, message: 'Server error. Please try again.' });
+        return res.status(500).json(ResponseObj.failure('Server error. Please try again.'));
     }
 };
 
@@ -66,36 +55,32 @@ const verifyOTP = async (req, res) => {
     const { mobileNumber, otp } = req.body;
 
     if (!mobileNumber || !otp) {
-        return res.status(400).json({ message: 'Mobile number and OTP are required.' });
+        return res.status(400).json(ResponseObj.failure('Mobile number and OTP are required.'));
     }
 
     try {
-        // Find the latest registered user for the given mobileNumber (based on timestamp)
         const user = await User.findOne({ mobileNumber }).sort({ timestamp: -1 });
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+            return res.status(404).json(ResponseObj.failure('User not found.'));
         }
 
         if (user.otp !== otp) {
-            return res.status(400).json({ message: 'Invalid OTP.' });
+            return res.status(400).json(ResponseObj.failure('Invalid OTP.'));
         }
 
-        // Retrieve the deviceId from the latest registered user
         const deviceId = user.deviceId;
 
-        // Set all previous records with the same mobileNumber to isActive = false
         await User.updateMany({ mobileNumber }, { $set: { isActive: false } });
 
-        // Set the latest verified user as active
         user.isVerified = true;
         user.isActive = true;
         await user.save();
 
-        return res.status(200).json({ message: 'OTP verified successfully.', user, deviceId });
+        return res.status(200).json(ResponseObj.success('OTP verified successfully.', { user, deviceId }));
     } catch (error) {
         console.error(error);
-        return res.status(500).json({ message: 'Server error', error });
+        return res.status(500).json(ResponseObj.failure('Server error', error));
     }
 };
 
@@ -103,26 +88,20 @@ const sendPushNotificationOnLogin = async (req, res) => {
     try {
         const { mobileNumber, websiteId, websiteName, notificationSent, notificationExpires } = req.body;
 
-        // Validate required fields
         if (![mobileNumber, websiteId, websiteName, notificationSent, notificationExpires].every(Boolean)) {
-            return res.status(400).json({ 
-                success: false, 
-                message: 'All fields (mobileNumber, websiteId, websiteName, notificationSent, notificationExpires) are required.' 
-            });
+            return res.status(400).json(ResponseObj.failure('All fields (mobileNumber, websiteId, websiteName, notificationSent, notificationExpires) are required.'));
         }
 
-        // Find the active and verified user for the given mobile number
         const user = await User.findOne({ mobileNumber, isVerified: true, isActive: true });
 
         if (!user) {
-            return res.status(404).json({ success: false, message: 'No active and verified user found.' });
+            return res.status(404).json(ResponseObj.failure('No active and verified user found.'));
         }
 
         if (!user.firebaseToken) {
-            return res.status(400).json({ success: false, message: 'No FCM token found for this user.' });
+            return res.status(400).json(ResponseObj.failure('No FCM token found for this user.'));
         }
 
-        // Prepare push notification payload
         const notificationPayload = {
             notification: {
                 title: 'Login Attempt',
@@ -132,14 +111,9 @@ const sendPushNotificationOnLogin = async (req, res) => {
             token: user.firebaseToken,
         };
 
-        // Send push notification
         const fcmResponse = await admin.messaging().send(notificationPayload);
 
-        res.status(200).json({ 
-            success: true, 
-            message: 'Push notification sent successfully.', 
-            fcmResponse 
-        });
+        res.status(200).json(ResponseObj.success('Push notification sent successfully.', { fcmResponse }));
     } catch (error) {
         console.error('Error sending push notification:', error);
 
@@ -148,46 +122,42 @@ const sendPushNotificationOnLogin = async (req, res) => {
             ? 'Invalid or unregistered Firebase token.'
             : 'Server error. Please try again later.';
 
-        res.status(error.code ? 400 : 500).json({ success: false, message: errorMessage, error: error.message });
+        res.status(error.code ? 400 : 500).json(ResponseObj.failure(errorMessage, error.message));
     }
 };
-
 
 const updateDeviceAndToken = async (req, res) => {
     const { mobileNumber, newDeviceId, newFirebaseToken } = req.body;
 
-    // Validate required fields
     if (!mobileNumber || !newDeviceId || !newFirebaseToken) {
-        return res.status(400).json({ message: 'Mobile number, new device ID, and new Firebase token are required.' });
+        return res.status(400).json(ResponseObj.failure('Mobile number, new device ID, and new Firebase token are required.'));
     }
 
     try {
-        // Find user by mobile number
         const user = await User.findOne({ mobileNumber });
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+            return res.status(404).json(ResponseObj.failure('User not found.'));
         }
 
-        // Update deviceId and firebaseToken
         user.deviceId = newDeviceId;
         user.firebaseToken = newFirebaseToken;
         await user.save();
 
-        res.status(200).json({ message: 'Device ID and Firebase token updated successfully.', user });
+        res.status(200).json(ResponseObj.success('Device ID and Firebase token updated successfully.', { user }));
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error', error });
+        res.status(500).json(ResponseObj.failure('Server error', error));
     }
 };
 
 const getAllUsers = async (req, res) => {
     try {
         const users = await User.find();
-        res.status(200).json(users);
+        res.status(200).json(ResponseObj.success('Users retrieved successfully.', { users }));
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error', error });
+        res.status(500).json(ResponseObj.failure('Server error', error));
     }
 };
 
@@ -198,13 +168,13 @@ const getUserByMobileNumber = async (req, res) => {
         const user = await User.findOne({ mobileNumber });
 
         if (!user) {
-            return res.status(404).json({ message: 'User not found.' });
+            return res.status(404).json(ResponseObj.failure('User not found.'));
         }
 
-        res.status(200).json(user);
+        res.status(200).json(ResponseObj.success('User retrieved successfully.', { user }));
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error', error });
+        res.status(500).json(ResponseObj.failure('Server error', error));
     }
 };
 
@@ -212,7 +182,7 @@ const sendPushNotification = async (req, res) => {
     const { firebaseToken, title, body } = req.body;
 
     if (!firebaseToken || !title || !body) {
-        return res.status(400).json({ message: 'Firebase Token, title, and body are required.' });
+        return res.status(400).json(ResponseObj.failure('Firebase Token, title, and body are required.'));
     }
 
     const message = {
@@ -225,28 +195,25 @@ const sendPushNotification = async (req, res) => {
 
     try {
         const response = await admin.messaging().send(message);
-        res.status(200).json({ message: 'Notification sent successfully', response });
+        res.status(200).json(ResponseObj.success('Notification sent successfully', { response }));
     } catch (error) {
         console.error('Error sending notification:', error);
-        res.status(500).json({ message: 'Failed to send notification', error });
+        res.status(500).json(ResponseObj.failure('Failed to send notification', error));
     }
 };
 
 const deleteAllUsers = async (req, res) => {
     try {
-        // Delete all users from the database
         const result = await User.deleteMany({});
 
-        // Check if any users were deleted
         if (result.deletedCount === 0) {
-            return res.status(404).json({ message: 'No users found to delete.' });
+            return res.status(404).json(ResponseObj.failure('No users found to delete.'));
         }
 
-        // Return success response
-        res.status(200).json({ message: 'All users deleted successfully.', deletedCount: result.deletedCount });
+        res.status(200).json(ResponseObj.success('All users deleted successfully.', { deletedCount: result.deletedCount }));
     } catch (error) {
         console.error('Error deleting users:', error);
-        res.status(500).json({ message: 'Server error. Failed to delete users.', error });
+        res.status(500).json(ResponseObj.failure('Server error. Failed to delete users.', error));
     }
 };
 
