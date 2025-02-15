@@ -1,75 +1,58 @@
 const Website = require('../model/websiteModel');
 const User = require('../model/userModel');
+const ResponseObj = require('../utils/responseUtil'); // Import ResponseObj
 
-// verifies and records a user's login attempt from a specific website using their mobile number and device ID.
 const authenticateWebsite = async (req, res) => {
     const { mobileNumber, action, websiteId } = req.body;
 
     try {
-        // Check if the mobile number exists in the User model
         const user = await User.findOne({ mobileNumber });
 
         if (!user) {
-            return res.status(404).json({ message: 'User with the provided mobile number does not exist.' });
+            return res.status(404).json(ResponseObj.failure('User with the provided mobile number does not exist.'));
         }
 
-        // Get the deviceId linked with the mobileNumber from the User model
         const deviceId = user.deviceId; 
 
         if (!deviceId) {
-            return res.status(400).json({ message: 'Device ID is not associated with the user.' });
+            return res.status(400).json(ResponseObj.failure('Device ID is not associated with the user.'));
         }
 
-        // Check if the website entry already exists
         let website = await Website.findOne({ mobileNumber, websiteId });
 
         if (website) {
-            // If action is true, update the website details
             if (action) {
-                website.isAuthenticate = true; // Set isAuthenticate to true
-                website.timestamp = new Date(); // Update the timestamp
-                website.deviceId = deviceId; // Update the deviceId (if needed)
-
+                website.isAuthenticate = true;
+                website.timestamp = new Date();
+                website.deviceId = deviceId;
                 await website.save();
 
-                // Remove the '_id' and '__v' fields from the response
                 const websiteResponse = website.toObject();
                 delete websiteResponse._id;
                 delete websiteResponse.__v;
 
-                return res.status(200).json({ message: 'Website details updated successfully.', data: websiteResponse });
+                return res.status(200).json(ResponseObj.success('Website details updated successfully.', websiteResponse));
             } else {
-                // If action is false, do not save and return a message
-                return res.status(200).json({ message: 'Action is false. No details were updated.' });
+                return res.status(200).json(ResponseObj.success('Action is false. No details were updated.'));
             }
         } else {
-            // If website does not exist, save the new details
             if (action) {
-                const websiteData = {
-                    websiteId,
-                    mobileNumber,
-                    deviceId,
-                    isAuthenticate: true, // Set isAuthenticate to true
-                    timestamp: new Date(), // Save the timestamp
-                };
-
+                const websiteData = { websiteId, mobileNumber, deviceId, isAuthenticate: true, timestamp: new Date() };
                 const newWebsite = new Website(websiteData);
                 await newWebsite.save();
 
-                // Remove the '_id' and '__v' fields from the response
                 const websiteResponse = newWebsite.toObject();
                 delete websiteResponse._id;
                 delete websiteResponse.__v;
 
-                return res.status(201).json({ message: 'Website details saved successfully.', data: websiteResponse });
+                return res.status(201).json(ResponseObj.success('Website details saved successfully.', websiteResponse));
             } else {
-                // If action is false, do not save and return a message
-                return res.status(200).json({ message: 'Action is false. No details were saved.' });
+                return res.status(200).json(ResponseObj.success('Action is false. No details were saved.'));
             }
         }
     } catch (error) {
         console.error('Error in authenticateWebsite:', error);
-        return res.status(500).json({ message: 'Internal server error.', error: error.message });
+        return res.status(500).json(ResponseObj.failure('Internal server error.', error.message));
     }
 };
 

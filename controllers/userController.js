@@ -1,12 +1,29 @@
 const admin = require('../config/firebaseConfig');
 const User = require('../model/userModel');
-const ResponseObj = require('../utils/responseUtil'); 
+const ResponseObj = require('../utils/responseUtil');
 
 const registerUserAndGenerateOTP = async (req, res) => {
     const { mobileNumber, email, deviceId, deviceName, firebaseToken, websiteId, websiteName } = req.body;
 
-    if (!mobileNumber || !deviceId || !firebaseToken || !deviceName) {
-        return res.status(400).json(ResponseObj.failure('All fields are required.'));
+    // TODO: Handle each case seperately
+    // if (!mobileNumber || !deviceId || !firebaseToken || !deviceName) {
+    //     return res.status(400).json(ResponseObj.failure('All fields are required.'));
+    // }
+
+    if (!mobileNumber) {
+        return res.status(400).json(ResponseObj.failure('Mobile number is required.'));
+    }
+
+    if (!deviceId) {
+        return res.status(400).json(ResponseObj.failure('Device ID is required.'));
+    }
+
+    if (!firebaseToken) {
+        return res.status(400).json(ResponseObj.failure('Firebase token is required.'));
+    }
+
+    if (!deviceName) {
+        return res.status(400).json(ResponseObj.failure('Device name is required.'));
     }
 
     try {
@@ -47,13 +64,14 @@ const registerUserAndGenerateOTP = async (req, res) => {
         }
     } catch (error) {
         console.error(error);
-        return res.status(500).json(ResponseObj.failure('Server error. Please try again.'));
+        return res.status(500).json(ResponseObj.failure('Internal server error', error.message));
     }
 };
 
 const verifyOTP = async (req, res) => {
     const { mobileNumber, otp } = req.body;
 
+    // TODO: Add mob in the response data only
     if (!mobileNumber || !otp) {
         return res.status(400).json(ResponseObj.failure('Mobile number and OTP are required.'));
     }
@@ -77,19 +95,22 @@ const verifyOTP = async (req, res) => {
         user.isActive = true;
         await user.save();
 
-        return res.status(200).json(ResponseObj.success('OTP verified successfully.', { user, deviceId }));
+        return res.status(200).json(ResponseObj.success('OTP verified successfully.', { mobileNumber }));
     } catch (error) {
         console.error(error);
-        return res.status(500).json(ResponseObj.failure('Server error', error));
+        return res.status(500).json(ResponseObj.failure('Server error', error.message));
     }
 };
 
 const sendPushNotificationOnLogin = async (req, res) => {
     try {
-        const { mobileNumber, websiteId, websiteName, notificationSent, notificationExpires } = req.body;
+        const { mobileNumber, websiteId, websiteName } = req.body;
 
-        if (![mobileNumber, websiteId, websiteName, notificationSent, notificationExpires].every(Boolean)) {
-            return res.status(400).json(ResponseObj.failure('All fields (mobileNumber, websiteId, websiteName, notificationSent, notificationExpires) are required.'));
+        const requiredFields = { mobileNumber, websiteId, websiteName };
+        for (const [key, value] of Object.entries(requiredFields)) {
+            if (!value) {
+                return res.status(400).json(ResponseObj.failure(`Enter the ${key.replace(/([A-Z])/g, ' $1').trim()}`));
+            }
         }
 
         const user = await User.findOne({ mobileNumber, isVerified: true, isActive: true });
@@ -102,23 +123,38 @@ const sendPushNotificationOnLogin = async (req, res) => {
             return res.status(400).json(ResponseObj.failure('No FCM token found for this user.'));
         }
 
+        // Set notificationSent as the current time and notificationExpires as 60 seconds later
+        const notificationSent = new Date();
+        const notificationExpires = new Date(notificationSent.getTime() + 60000); // 60 seconds later
+
+        // Calculate expiration time in seconds
+        const expirationInSeconds = Math.round((notificationExpires - new Date()) / 1000);
+
+        // Push notification payload
         const notificationPayload = {
             notification: {
                 title: 'Login Attempt',
                 body: `Are you trying to login to ${websiteName}?`,
             },
-            data: { websiteId, websiteName, notificationSent, notificationExpires },
+            data: { websiteId, websiteName, notificationSent: notificationSent.toISOString(), notificationExpires: notificationExpires.toISOString() },
             token: user.firebaseToken,
         };
 
         const fcmResponse = await admin.messaging().send(notificationPayload);
 
-        res.status(200).json(ResponseObj.success('Push notification sent successfully.', { fcmResponse }));
+        res.status(200).json(ResponseObj.success('Push notification sent successfully.', {
+            fcmResponse,
+            websiteId,
+            websiteName,
+            notificationSent: notificationSent.toISOString(),
+            notificationExpires: notificationExpires.toISOString(),
+            expiresInSeconds: expirationInSeconds
+        }));
     } catch (error) {
-        console.error('Error sending push notification:', error);
+        console.error('Error sending push notification:', error.message);
 
-        const errorMessage = error.code === 'messaging/invalid-registration-token' || 
-                             error.code === 'messaging/registration-token-not-registered'
+        const errorMessage = error.code === 'messaging/invalid-registration-token' ||
+            error.code === 'messaging/registration-token-not-registered'
             ? 'Invalid or unregistered Firebase token.'
             : 'Server error. Please try again later.';
 
@@ -126,11 +162,16 @@ const sendPushNotificationOnLogin = async (req, res) => {
     }
 };
 
+
+
 const updateDeviceAndToken = async (req, res) => {
     const { mobileNumber, newDeviceId, newFirebaseToken } = req.body;
 
-    if (!mobileNumber || !newDeviceId || !newFirebaseToken) {
-        return res.status(400).json(ResponseObj.failure('Mobile number, new device ID, and new Firebase token are required.'));
+    const requiredFields = { mobileNumber, newDeviceId, newFirebaseToken };
+    for (const [key, value] of Object.entries(requiredFields)) {
+        if (!value) {
+            return res.status(400).json(ResponseObj.failure(`Enter the ${key.replace(/([A-Z])/g, ' $1').trim()}`))
+        }
     }
 
     try {
