@@ -125,7 +125,7 @@ const sendPushNotificationOnLogin = async (req, res) => {
         const websiteEntry = await Website.findOne({ mobileNumber, websiteId });
 
         // If the user is already authenticated, return success
-        if (websiteEntry && websiteEntry.isAuthenticated) {
+        if (websiteEntry && websiteEntry.isAuthenticate) {
             return res.status(200).json(ResponseObj.success('User is already authenticated.', null));
         }
 
