@@ -125,7 +125,7 @@ const sendPushNotificationOnLogin = async (req, res) => {
         const websiteEntry = await Website.findOne({ mobileNumber, websiteId });
 
         // If the user is already authenticated, return success
-        if (websiteEntry.isAuthenticated) {
+        if (websiteEntry && websiteEntry.isAuthenticated) {
             return res.status(200).json(ResponseObj.success('User is already authenticated.', null));
         }
 
@@ -148,7 +148,7 @@ const sendPushNotificationOnLogin = async (req, res) => {
                 notificationSent: notificationSent.toISOString(),
                 notificationExpires: notificationExpires.toISOString(),
             },
-            token: firebaseToken,
+            token: user.firebaseToken,
         };
 
         const fcmResponse = await admin.messaging().send(notificationPayload);
@@ -216,7 +216,7 @@ const getUserByMobileNumber = async (req, res) => {
     const { mobileNumber } = req.params;
 
     try {
-        const user = await User.findOne({ mobileNumber });
+        const user = await User.findOne({ mobileNumber, isVerified: true, isActive: true  });
 
         if (!user) {
             return res.status(404).json(ResponseObj.failure('User not found.'));
