@@ -6,7 +6,7 @@ const authenticateWebsite = async (req, res) => {
     const { mobileNumber, action, websiteId } = req.body;
 
     try {
-        const user = await User.findOne({ mobileNumber });
+        const user = await User.findOne({ mobileNumber, isVerified: true, isActive: true });
 
         if (!user) {
             return res.status(404).json(ResponseObj.failure('User with the provided mobile number does not exist.'));

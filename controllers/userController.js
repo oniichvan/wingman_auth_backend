@@ -1,6 +1,7 @@
 const admin = require('../config/firebaseConfig');
 const User = require('../model/userModel');
 const ResponseObj = require('../utils/responseUtil');
+const Website = require('../model/websiteModel')
 
 const registerUserAndGenerateOTP = async (req, res) => {
     const { mobileNumber, email, deviceId, deviceName, firebaseToken, websiteId, websiteName } = req.body;
@@ -104,7 +105,7 @@ const verifyOTP = async (req, res) => {
 
 const sendPushNotificationOnLogin = async (req, res) => {
     try {
-        const { mobileNumber, websiteId, websiteName } = req.body;
+        const { mobileNumber, websiteId, websiteName, firebaseToken } = req.body;
 
         const requiredFields = { mobileNumber, websiteId, websiteName };
         for (const [key, value] of Object.entries(requiredFields)) {
@@ -113,45 +114,59 @@ const sendPushNotificationOnLogin = async (req, res) => {
             }
         }
 
+        // Find user in the database
         const user = await User.findOne({ mobileNumber, isVerified: true, isActive: true });
 
         if (!user) {
             return res.status(404).json(ResponseObj.failure('No active and verified user found.'));
         }
 
-        if (!user.firebaseToken) {
-            return res.status(400).json(ResponseObj.failure('No FCM token found for this user.'));
+        // Check if user exists in the Website model
+        const websiteEntry = await Website.findOne({ mobileNumber, websiteId });
+
+        if (!websiteEntry) {
+            return res.status(404).json(ResponseObj.failure('No entry found for the given mobile number and website.'));
         }
 
-        // Set notificationSent as the current time and notificationExpires as 60 seconds later
+        // If the user is already authenticated, return success
+        if (websiteEntry.isAuthenticated) {
+            return res.status(200).json(ResponseObj.success('User is already authenticated.', null));
+        }
+
+        // If user is not authenticated, send push notification
+        if (!firebaseToken) {
+            return res.status(400).json(ResponseObj.failure('No FCM token provided for this user.'));
+        }
+
         const notificationSent = new Date();
         const notificationExpires = new Date(notificationSent.getTime() + 60000); // 60 seconds later
 
-        // Calculate expiration time in seconds
-        const expirationInSeconds = Math.round((notificationExpires - new Date()) / 1000);
-
-        // Push notification payload
         const notificationPayload = {
             notification: {
                 title: 'Login Attempt',
-                body: `Are you trying to login to ${websiteName}?`,
+                body: `A login attempt was made for ${websiteName}.`,
             },
-            data: { websiteId, websiteName, notificationSent: notificationSent.toISOString(), notificationExpires: notificationExpires.toISOString() },
-            token: user.firebaseToken,
+            data: {
+                websiteId,
+                websiteName,
+                notificationSent: notificationSent.toISOString(),
+                notificationExpires: notificationExpires.toISOString(),
+            },
+            token: firebaseToken,
         };
 
         const fcmResponse = await admin.messaging().send(notificationPayload);
 
-        res.status(200).json(ResponseObj.success('Push notification sent successfully.', {
+        return res.status(200).json(ResponseObj.success('User not authenticated. Push notification sent.', {
             fcmResponse,
             websiteId,
             websiteName,
             notificationSent: notificationSent.toISOString(),
             notificationExpires: notificationExpires.toISOString(),
-            expiresInSeconds: expirationInSeconds
+            expiresInSeconds: 60
         }));
     } catch (error) {
-        console.error('Error sending push notification:', error.message);
+        console.error('Error:', error.message);
 
         const errorMessage = error.code === 'messaging/invalid-registration-token' ||
             error.code === 'messaging/registration-token-not-registered'
@@ -161,7 +176,6 @@ const sendPushNotificationOnLogin = async (req, res) => {
         res.status(error.code ? 400 : 500).json(ResponseObj.failure(errorMessage, error.message));
     }
 };
-
 
 
 const updateDeviceAndToken = async (req, res) => {
