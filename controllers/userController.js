@@ -105,7 +105,7 @@ const verifyOTP = async (req, res) => {
 
 const sendPushNotificationOnLogin = async (req, res) => {
     try {
-        const { mobileNumber, websiteId, websiteName, firebaseToken } = req.body;
+        const { mobileNumber, websiteId, websiteName } = req.body;
 
         const requiredFields = { mobileNumber, websiteId, websiteName };
         for (const [key, value] of Object.entries(requiredFields)) {
@@ -124,17 +124,13 @@ const sendPushNotificationOnLogin = async (req, res) => {
         // Check if user exists in the Website model
         const websiteEntry = await Website.findOne({ mobileNumber, websiteId });
 
-        if (!websiteEntry) {
-            return res.status(404).json(ResponseObj.failure('No entry found for the given mobile number and website.'));
-        }
-
         // If the user is already authenticated, return success
         if (websiteEntry.isAuthenticated) {
             return res.status(200).json(ResponseObj.success('User is already authenticated.', null));
         }
 
         // If user is not authenticated, send push notification
-        if (!firebaseToken) {
+        if (!user.firebaseToken) {
             return res.status(400).json(ResponseObj.failure('No FCM token provided for this user.'));
         }
 
