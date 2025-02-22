@@ -6,11 +6,6 @@ const Website = require('../model/websiteModel')
 const registerUserAndGenerateOTP = async (req, res) => {
     const { mobileNumber, email, deviceId, deviceName, firebaseToken, websiteId, websiteName } = req.body;
 
-    // TODO: Handle each case seperately
-    // if (!mobileNumber || !deviceId || !firebaseToken || !deviceName) {
-    //     return res.status(400).json(ResponseObj.failure('All fields are required.'));
-    // }
-
     if (!mobileNumber) {
         return res.status(400).json(ResponseObj.failure('Mobile number is required.'));
     }
@@ -29,13 +24,25 @@ const registerUserAndGenerateOTP = async (req, res) => {
 
     try {
         const generatedOTP = '9999'; // Static OTP for testing
-
-        let existingUser = await User.findOne({ mobileNumber, deviceId });
+        let existingUser = await User.findOne({ deviceId });
 
         if (existingUser) {
-            existingUser.email = email;
+            // If a different mobile number is provided, update it
+            if (mobileNumber !== existingUser.mobileNumber) {
+                existingUser.mobileNumber = mobileNumber;
+            }
+
+            // Update email if provided and different
+            if (email && email !== existingUser.email) {
+                existingUser.email = email;
+            }
+
+            // Update Firebase token if provided and different
+            if (firebaseToken !== existingUser.firebaseToken) {
+                existingUser.firebaseToken = firebaseToken;
+            }
+
             existingUser.deviceName = deviceName;
-            existingUser.firebaseToken = firebaseToken;
             existingUser.websiteId = websiteId;
             existingUser.websiteName = websiteName;
             existingUser.otp = generatedOTP;
@@ -43,8 +50,9 @@ const registerUserAndGenerateOTP = async (req, res) => {
             existingUser.isActive = false;
             await existingUser.save();
 
-            return res.status(200).json(ResponseObj.success('OTP regenerated for existing user.', { otp: generatedOTP }));
+            return res.status(200).json(ResponseObj.success('User details updated and OTP regenerated.', { otp: generatedOTP }));
         } else {
+            // Register new user
             const user = new User({
                 mobileNumber,
                 email,
@@ -68,6 +76,7 @@ const registerUserAndGenerateOTP = async (req, res) => {
         return res.status(500).json(ResponseObj.failure('Internal server error', error.message));
     }
 };
+
 
 const verifyOTP = async (req, res) => {
     const { mobileNumber, otp } = req.body;
