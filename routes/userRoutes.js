@@ -8,6 +8,7 @@ const {
     updateDeviceAndToken,
     getAllUsers,
     getUserByMobileNumber,
+    getUserIfVerified,
 } = require('../controllers/userController');
 
 const router = express.Router();
@@ -24,6 +25,10 @@ router.post('/onLogin', sendPushNotificationOnLogin);
 router.post('/update-device-token', updateDeviceAndToken);
 // Get all users
 router.get('/all-users', getAllUsers);
+
+// Get a user if isVerified is true
+router.get('/is-verified/:mobileNumber', getUserIfVerified);
+
 // Get a user by mobile number
 router.get('/user/:mobileNumber', getUserByMobileNumber);
 // Send Push Notification

@@ -182,7 +182,6 @@ const sendPushNotificationOnLogin = async (req, res) => {
     }
 };
 
-
 const updateDeviceAndToken = async (req, res) => {
     const { mobileNumber, newDeviceId, newFirebaseToken } = req.body;
 
@@ -221,11 +220,36 @@ const getAllUsers = async (req, res) => {
     }
 };
 
+const getUserIfVerified = async (req, res) => {
+    const { mobileNumber } = req.params;
+
+    if (!mobileNumber) {
+        return res.status(400).json(ResponseObj.failure('Mobile number is required.'));
+    }
+
+    try {
+        const user = await User.findOne({ mobileNumber });
+        if (!user) {
+            return res.status(404).json(ResponseObj.failure('User not found'));
+        }
+
+        if (!user.isVerified) {
+            return res.status(400).json(ResponseObj.failure('User is not verified', { isVerified: user.isVerified }));
+            // return res.status(400).json({ isSuccess: false, message: 'User is not verified', isVerified: user.isVerified });
+        }
+
+        res.status(200).json(ResponseObj.success('User is Verified', { isVerified: user.isVerified }));
+    } catch (error) {
+        console.error(error);
+        res.status(500).json(ResponseObj.failure('Internal Server error', error));
+    }
+}
+
 const getUserByMobileNumber = async (req, res) => {
     const { mobileNumber } = req.params;
 
     try {
-        const user = await User.findOne({ mobileNumber, isVerified: true, isActive: true  });
+        const user = await User.findOne({ mobileNumber, isVerified: true, isActive: true });
 
         if (!user) {
             return res.status(404).json(ResponseObj.failure('User not found.'));
@@ -286,4 +310,5 @@ module.exports = {
     getUserByMobileNumber,
     sendPushNotification,
     deleteAllUsers,
+    getUserIfVerified
 };
