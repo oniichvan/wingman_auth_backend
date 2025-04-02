@@ -18,18 +18,14 @@ const authenticateWebsite = async (req, res) => {
             return res.status(400).json(ResponseObj.failure('Device ID is not associated with the user.'));
         }
 
-        if (!action) {
-            return res.status(200).json(ResponseObj.success('Action is false. No details were updated.'));
-        }
-
         // Find an existing entry by deviceId (regardless of websiteId)
         let website = await Website.findOne({ deviceId });
 
         if (website) {
-            // ✅ Update the existing entry with the new websiteId
+            // ✅ Update the existing entry
             website.websiteId = websiteId;
             website.mobileNumber = mobileNumber;
-            website.isAuthenticate = true;
+            website.isAuthenticate = action; // Store even if action is false
             website.timestamp = new Date();
             await website.save();
 
@@ -40,7 +36,13 @@ const authenticateWebsite = async (req, res) => {
             return res.status(200).json(ResponseObj.success('Website details updated successfully.', websiteResponse));
         } else {
             // ✅ Create a new entry if no record exists for the deviceId
-            const websiteData = { websiteId, mobileNumber, deviceId, isAuthenticate: true, timestamp: new Date() };
+            const websiteData = { 
+                websiteId, 
+                mobileNumber, 
+                deviceId, 
+                isAuthenticate: action, // Store even if action is false
+                timestamp: new Date() 
+            };
             const newWebsite = new Website(websiteData);
             await newWebsite.save();
 
