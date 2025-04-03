@@ -55,7 +55,11 @@ const userSchema = new mongoose.Schema({
     isActive: {
         type: Boolean,
         default: false
-    }
+    },
+    isAuthenticated: {
+        type: Boolean,
+        default: false
+    },
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);
