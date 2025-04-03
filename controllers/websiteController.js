@@ -3,7 +3,7 @@ const User = require('../model/userModel');
 const ResponseObj = require('../utils/responseUtil');
 
 const authenticateWebsite = async (req, res) => {
-    const { mobileNumber, action, websiteId } = req.body;
+    const { mobileNumber, action = false, websiteId } = req.body; // Default action to false
 
     try {
         const user = await User.findOne({ mobileNumber, isVerified: true, isActive: true });
