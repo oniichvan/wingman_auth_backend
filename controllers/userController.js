@@ -112,6 +112,33 @@ const verifyOTP = async (req, res) => {
     }
 };
 
+const setUserAuthenticationToFalse = async (req, res) => {
+    const { mobileNumber } = req.body;
+
+    if (!mobileNumber) {
+        return res.status(400).json(ResponseObj.failure('Mobile number is required.'));
+    }
+
+    try {
+        const user = await User.findOne({ mobileNumber });
+
+        if (!user) {
+            return res.status(404).json(ResponseObj.failure('User not found.'));
+        }
+
+        if (user.isAuthenticated) {
+            user.isAuthenticated = false;
+            await user.save();
+            return res.status(200).json(ResponseObj.success('User authentication status set to false.', { isAuthenticated: user.isAuthenticated }));
+        }
+
+        return res.status(200).json(ResponseObj.success('User authentication status is already false.', { isAuthenticated: user.isAuthenticated }));
+    } catch (error) {
+        console.error('Error in setUserAuthenticationToFalse:', error);
+        return res.status(500).json(ResponseObj.failure('Internal server error.', error.message));
+    }
+};
+
 const sendPushNotificationOnLogin = async (req, res) => {
     try {
         const { mobileNumber, websiteId, websiteName } = req.body;
@@ -134,9 +161,10 @@ const sendPushNotificationOnLogin = async (req, res) => {
         const websiteEntry = await Website.findOne({ mobileNumber, websiteId });
 
         // If the user is already authenticated, return success
-        if (websiteEntry && websiteEntry.isAuthenticate) {
-            return res.status(200).json(ResponseObj.success('User is already authenticated.', null));
-        }
+        // Just for testing purpose so that we can trigger push notification multiple times
+        // if (websiteEntry && websiteEntry.isAuthenticate) {
+        //     return res.status(200).json(ResponseObj.success('User is already authenticated.', null));
+        // }
 
         // If user is not authenticated, send push notification
         if (!user.firebaseToken) {
@@ -310,5 +338,6 @@ module.exports = {
     getUserByMobileNumber,
     sendPushNotification,
     deleteAllUsers,
-    getUserIfVerified
+    getUserIfVerified,
+    setUserAuthenticationToFalse
 };

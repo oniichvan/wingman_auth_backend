@@ -9,6 +9,7 @@ const {
     getAllUsers,
     getUserByMobileNumber,
     getUserIfVerified,
+    setUserAuthenticationToFalse,
 } = require('../controllers/userController');
 
 const router = express.Router();
@@ -20,6 +21,8 @@ router.post('/verify-otp', verifyOTP);
 // send push notification on login
 router.post('/onLogin', sendPushNotificationOnLogin);
 
+// Set User isAuthenticated to false
+router.post('/set-false', setUserAuthenticationToFalse);
 
 // Update Device ID and Firebase Token
 router.post('/update-device-token', updateDeviceAndToken);
