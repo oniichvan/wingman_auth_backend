@@ -151,10 +151,10 @@ const sendPushNotificationOnLogin = async (req, res) => {
         }
 
         // Find user in the database
-        const user = await User.findOne({ mobileNumber, isVerified: true, isActive: true });
+        const user = await User.findOne({ mobileNumber, isVerified: true }).sort({ timestamp: -1 });
 
-        if (!user) {
-            return res.status(404).json(ResponseObj.failure('No active and verified user found.'));
+        if (!user.isVerified) {
+            return res.status(400).json(ResponseObj.failure('User is not verified.'));
         }
 
         // Check if user exists in the Website model
@@ -277,7 +277,7 @@ const getUserByMobileNumber = async (req, res) => {
     const { mobileNumber } = req.params;
 
     try {
-        const user = await User.findOne({ mobileNumber, isVerified: true, isActive: true });
+        const user = await User.findOne({ mobileNumber, isVerified: true }).sort({ timestamp: -1 });
 
         if (!user) {
             return res.status(404).json(ResponseObj.failure('User not found.'));
