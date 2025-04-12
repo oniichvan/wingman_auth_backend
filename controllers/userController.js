@@ -24,35 +24,27 @@ const registerUserAndGenerateOTP = async (req, res) => {
 
     try {
         const generatedOTP = '9999'; // Static OTP for testing
-        let existingUser = await User.findOne({ deviceId });
 
-        if (existingUser) {
-            // If a different mobile number is provided, update it
-            if (mobileNumber !== existingUser.mobileNumber) {
-                existingUser.mobileNumber = mobileNumber;
-            }
+        // Check if a user with this mobileNumber already exists (regardless of deviceId)
+        const existingUserWithSameMobile = await User.findOne({ mobileNumber });
 
-            // Update email if provided and different
-            if (email && email !== existingUser.email) {
-                existingUser.email = email;
-            }
+        if (existingUserWithSameMobile) {
+            // Update the existing user (same mobileNumber, even if deviceId is different)
+            existingUserWithSameMobile.email = email || existingUserWithSameMobile.email;
+            existingUserWithSameMobile.deviceId = deviceId;
+            existingUserWithSameMobile.deviceName = deviceName;
+            existingUserWithSameMobile.firebaseToken = firebaseToken;
+            existingUserWithSameMobile.websiteId = websiteId;
+            existingUserWithSameMobile.websiteName = websiteName;
+            existingUserWithSameMobile.otp = generatedOTP;
+            existingUserWithSameMobile.timestamp = new Date();
+            existingUserWithSameMobile.isActive = false;
 
-            // Update Firebase token if provided and different
-            if (firebaseToken !== existingUser.firebaseToken) {
-                existingUser.firebaseToken = firebaseToken;
-            }
-
-            existingUser.deviceName = deviceName;
-            existingUser.websiteId = websiteId;
-            existingUser.websiteName = websiteName;
-            existingUser.otp = generatedOTP;
-            existingUser.timestamp = new Date();
-            existingUser.isActive = false;
-            await existingUser.save();
+            await existingUserWithSameMobile.save();
 
             return res.status(200).json(ResponseObj.success('User details updated and OTP regenerated.', { otp: generatedOTP }));
         } else {
-            // Register new user
+            // If mobileNumber is new, create a new record (even if deviceId is reused)
             const user = new User({
                 mobileNumber,
                 email,
@@ -76,7 +68,6 @@ const registerUserAndGenerateOTP = async (req, res) => {
         return res.status(500).json(ResponseObj.failure('Internal server error', error.message));
     }
 };
-
 
 const verifyOTP = async (req, res) => {
     const { mobileNumber, otp } = req.body;
